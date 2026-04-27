@@ -1,27 +1,28 @@
-"""Run the Airbnb Full-Data Scraper Apify Actor and print results.
+"""Airbnb Full-Data Scraper — Apify Actor client example.
 
-Get your Apify API token: https://console.apify.com/settings/integrations
-Actor page: https://apify.com/hotels-scrapers/airbnb-scraper
+Runs the Actor for a single search, writes the dataset to airbnb_results.json,
+and prints aggregate STR metrics (mean occupancy / ADR / RevPAR).
 
-Install:
-    pip install -r requirements.txt
-
-Run:
-    APIFY_TOKEN=your_token python main.py
+Docs: https://apify.com/hotels-scrapers/airbnb-scraper
 """
 
+import json
 import os
+import statistics
+from pathlib import Path
 
 from apify_client import ApifyClient
 
-ACTOR_ID = "hotels-scrapers/airbnb-scraper"
+ACTOR = "hotels-scrapers/airbnb-scraper"
+OUTPUT_FILE = Path("airbnb_results.json")
+
+
+def _mean(values: list[float]) -> float:
+    return statistics.mean(values) if values else 0.0
 
 
 def main() -> None:
-    token = os.environ.get("APIFY_TOKEN")
-    if not token:
-        raise SystemExit("Set APIFY_TOKEN env var. Get one at https://console.apify.com/settings/integrations")
-
+    token = os.environ.get("APIFY_TOKEN") or _die("Set APIFY_TOKEN — https://console.apify.com/settings/integrations")
     client = ApifyClient(token)
 
     run_input = {
@@ -34,25 +35,28 @@ def main() -> None:
         "proxyConfiguration": {"useApifyProxy": True, "apifyProxyGroups": ["RESIDENTIAL"]},
     }
 
-    print(f"Starting actor {ACTOR_ID} ...")
-    run = client.actor(ACTOR_ID).call(run_input=run_input)
+    print(f"[airbnb] starting actor {ACTOR}")
+    run = client.actor(ACTOR).call(run_input=run_input)
+    print(f"[airbnb] {run['status']}  •  run_id={run['id']}")
 
-    print(f"Run finished: {run['status']}  (run id: {run['id']})")
-    print(f"Console: https://console.apify.com/actors/runs/{run['id']}\n")
+    items = client.dataset(run["defaultDatasetId"]).list_items().items
+    OUTPUT_FILE.write_text(json.dumps(items, indent=2, ensure_ascii=False))
+    print(f"[airbnb] saved {len(items)} listings → {OUTPUT_FILE}\n")
 
-    dataset = client.dataset(run["defaultDatasetId"])
-    items = dataset.list_items().items
-    print(f"Got {len(items)} listings.\n")
+    occ = [i["occupancyRate"] for i in items if i.get("occupancyRate") is not None]
+    adr = [i["ADR"] for i in items if i.get("ADR") is not None]
+    rev = [i["RevPAR"] for i in items if i.get("RevPAR") is not None]
 
-    for item in items[:5]:
-        print(
-            f"- {item.get('title', '?')[:50]:50}  "
-            f"occ={item.get('occupancyRate', '?')}  "
-            f"ADR={item.get('ADR', '?')}  "
-            f"RevPAR={item.get('RevPAR', '?')}"
-        )
+    print("market summary")
+    print(f"  listings analysed : {len(items)}")
+    print(f"  mean occupancy    : {_mean(occ):.1%}")
+    print(f"  mean ADR          : {_mean(adr):.2f}")
+    print(f"  mean RevPAR       : {_mean(rev):.2f}")
+    print(f"\nconsole → https://console.apify.com/actors/runs/{run['id']}")
 
-    print(f"\nFull dataset: https://api.apify.com/v2/datasets/{run['defaultDatasetId']}/items?format=json")
+
+def _die(msg: str) -> str:
+    raise SystemExit(msg)
 
 
 if __name__ == "__main__":

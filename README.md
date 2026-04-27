@@ -1,54 +1,58 @@
-# Airbnb Scraper — Occupancy Rate, ADR & RevPAR (Apify Actor)
+# Airbnb Scraper — Occupancy, ADR & RevPAR (Apify Actor)
 
-Scrape **[Airbnb](https://www.airbnb.com)** listings at scale and get the short-term-rental metrics that actually matter: **occupancy rate, ADR (Average Daily Rate), RevPAR (Revenue Per Available Room)**, plus a forward-looking 12-month booking calendar, host portfolio, reviews, photos, amenities and pricing.
+> Short-term-rental analytics on tap. No AirDNA subscription, no Mashvisor seat, no scraper to maintain.
 
-> 👉 Run it on Apify (no install): **[apify.com/hotels-scrapers/airbnb-scraper](https://apify.com/hotels-scrapers/airbnb-scraper)**
+Extract **[Airbnb](https://www.airbnb.com)** listings with the metrics that actually drive STR underwriting: forward 12-month **occupancy rate**, **ADR** (Average Daily Rate), **RevPAR** (Revenue Per Available Room), full booking calendar, host portfolio, reviews, amenities, and pricing.
 
-This repository is a minimal **Python example** showing how to invoke the deployed Actor through the Apify API and pull structured results.
+🚀 **Try it on Apify** → https://apify.com/hotels-scrapers/airbnb-scraper
 
-## What this Airbnb scraper extracts
+This GitHub repo is the **Python how-to** — a tiny `main.py` that calls the deployed Actor, dumps the results to JSON, and prints the market-level mean of occupancy / ADR / RevPAR.
 
-| Field | Description |
+## Built for
+
+- 🏘️ **STR investors** — comp underwriting before you wire EMD
+- 📈 **Market analysts** — backfill AirDNA-style reports across cities
+- 🏷️ **Pricing engines** — daily comp scrape into your dynamic-pricing model
+- 🕵️ **Operator intel** — map a competitor's full host portfolio in one run
+- 🏛️ **Tax / regulatory** — quantify Airbnb supply by neighborhood for policy briefs
+
+## What you get back
+
+| Field | Notes |
 |---|---|
-| `listingId` | Airbnb room ID |
-| `title` | Listing headline |
-| `city` / `country` | Location |
-| `occupancyRate` | Booked-nights ÷ available-nights over the 12-month window |
+| `listingId`, `title`, `city`, `country` | Listing identity & geo |
+| `occupancyRate` | Booked nights ÷ available nights, 12-month forward |
 | `ADR` | Average Daily Rate (currency configurable) |
-| `RevPAR` | Revenue Per Available Room |
-| `calendar` | Day-by-day booked / blocked / price for the next 12 months |
-| `reviewsCount` | Total reviews |
-| `host` | Host id, name, superhost flag, optional full portfolio |
+| `RevPAR` | `occupancyRate × ADR` |
+| `calendar` | Day-by-day booked / blocked / price (12 months) |
+| `reviewsCount`, `host` | Optional review and host-portfolio expansions |
 | `amenities`, `images`, `coordinates` | Standard listing detail |
 
-## Quick start — Python example
+## Quick start (Python)
 
 ```bash
 git clone https://github.com/everythingscraper/airbnb-scraper.git
 cd airbnb-scraper
 pip install -r requirements.txt
-export APIFY_TOKEN=your_apify_token   # https://console.apify.com/settings/integrations
-python main.py
+APIFY_TOKEN=your_token python main.py
 ```
 
-`main.py` runs a 10-listing search for Paris, prints occupancy/ADR/RevPAR for the first 5 hits, and links the full dataset.
+`main.py` runs a 10-listing Paris search, writes `airbnb_results.json`, and prints market means. Token: https://console.apify.com/settings/integrations.
 
-## How to scrape Airbnb — input options
+## Input — two modes
 
-Two modes:
+**`mode: "search"`** → set `location`, `checkIn`, `checkOut`, optional `currency` and `maxListings` (1–200).
 
-- **`mode: "search"`** — provide `location`, `checkIn`, `checkOut`. Optionally `currency`, `maxListings` (1–200).
-- **`mode: "direct"`** — provide an array of `listingUrls` (`https://www.airbnb.com/rooms/...`).
+**`mode: "direct"`** → pass an array of `listingUrls` (`https://www.airbnb.com/rooms/...`).
 
-Optional flags:
+Optional toggles:
+- `includeReviews` — fetch review text and stars per listing.
+- `includeHostPortfolio` — fetch every other listing the same host runs (operator-intel mode).
+- `proxyConfiguration` — residential required to clear Airbnb's WAF.
 
-- `includeReviews` — fetch reviews per listing.
-- `includeHostPortfolio` — fetch every other listing the host operates (great for STR investor research).
-- `proxyConfiguration` — residential is required to clear Airbnb's WAF.
+Schema: **[Input tab on Apify](https://apify.com/hotels-scrapers/airbnb-scraper/input-schema)**.
 
-Full input schema: **[Input tab on Apify](https://apify.com/hotels-scrapers/airbnb-scraper/input-schema)**.
-
-## Sample output
+## Sample row
 
 ```json
 {
@@ -64,41 +68,51 @@ Full input schema: **[Input tab on Apify](https://apify.com/hotels-scrapers/airb
 }
 ```
 
-Datasets export as **JSON, CSV, Excel, HTML, or XML**.
+Export from Apify Storage as **JSON, CSV, Excel, HTML, or XML**.
 
-## How much does it cost to scrape Airbnb?
+## Pricing
 
-Pay-per-result: **$0.005 per listing**. The Apify Free plan ($5 platform credit) covers ≈ 1,000 Airbnb listings. The Starter plan ($49/mo) covers ≈ 9,800 listings. Adding `includeReviews` or `includeHostPortfolio` increases CU consumption proportionally.
+**$0.005 per listing** (pay-per-result).
+
+| Plan | ≈ Listings |
+|---|---|
+| Free ($5 credit) | 1,000 |
+| Starter ($49/mo) | 9,800 |
+| Scale ($499/mo) | 99,800 |
+
+`includeReviews` and `includeHostPortfolio` increase CU consumption; baseline figures assume both off.
 
 ## FAQ
 
-**Why use this instead of Airbnb's official API?**
-Airbnb does not offer a public listings API. This Actor is the supported alternative for STR analytics, market research, and pricing intelligence.
+**How does this compare to AirDNA / Mashvisor?**
+Same methodology, raw data direct from Airbnb, ~80–95 % cheaper at low-to-mid volumes, fully programmatic.
 
-**How is `occupancyRate` calculated?**
-`booked_nights / available_nights` across the 12-month forward calendar (matches AirDNA / Mashvisor methodology).
+**Why is occupancy capped at the next 12 months?**
+Airbnb's calendar API only exposes a forward year. Snapshot on a schedule to build trailing history.
 
-**Are reviews and host data included?**
-Reviews are off by default (`includeReviews: false`) to save credits. Host portfolio (`includeHostPortfolio`) lets you map an entire operator across cities.
+**Reviews — full text or just count?**
+`reviewsCount` always; full review objects only when `includeReviews: true` (more credits).
 
-**What proxy do I need?**
-Residential. Airbnb's WAF blocks datacenter IPs. The default `apifyProxyGroups: ["RESIDENTIAL"]` is correct for most regions.
+**What proxies do I need?**
+Residential. The default `apifyProxyGroups: ["RESIDENTIAL"]` is correct for ~all geographies.
 
-**Can I scrape historical occupancy?**
-The Airbnb calendar only exposes forward 12 months. For historical, snapshot the dataset on a schedule and roll up over time.
+**Can I track a single operator across cities?**
+Yes — `includeHostPortfolio: true` returns every listing under the same host id, anywhere on Airbnb.
 
-**Need a different field or a custom run?**
-Open an issue or contact us via the [Apify Actor page](https://apify.com/hotels-scrapers/airbnb-scraper).
+**Webhook into Snowflake / BigQuery / S3?**
+Apify supports dataset-created webhooks plus first-party integrations with Make, Zapier, n8n, Keboola.
 
-## Other Apify Actors by everythingscraper
+## Other Apify Actors
 
-- 🏢 **[LoopNet Scraper](https://github.com/everythingscraper/loopnet-scraper)** — commercial real estate listings
-- 🏨 **[Trip.com Hotel Scraper](https://github.com/everythingscraper/trip-hotel-scraper)** — hotel pricing across 51 countries
-- 🏖️ **[Traveloka Hotel Scraper](https://github.com/everythingscraper/traveloka-hotel-scraper)** — Southeast Asia hotel data
+- 🏨 [Trip.com Hotel Scraper](https://github.com/everythingscraper/trip-hotel-scraper)
+- 🏖️ [Traveloka Hotel Scraper](https://github.com/everythingscraper/traveloka-hotel-scraper)
+- 🏢 [LoopNet Scraper](https://github.com/everythingscraper/loopnet-scraper)
+- 📊 [Moz Domain Authority Checker](https://github.com/everythingscraper/moz-domain-authority-checker)
+- 🧑‍💼 [Booksy Leads Scraper](https://github.com/everythingscraper/booksy-leads-scraper)
 
-## Is it legal to scrape Airbnb?
+## Legality
 
-This Actor extracts only publicly visible Airbnb data — listings, prices, public reviews, and public host info. It does not bypass logins or extract private user data. Personal data appearing in scraped results is protected by GDPR and similar laws. Use legitimately (market research, STR analytics) and consult your lawyers if unsure.
+Only publicly displayed Airbnb data is extracted: listings, public reviews, public host info. No login bypass, no private user data. Personal data appearing in scraped results is governed by GDPR and similar laws — use legitimately and consult counsel if unsure.
 
 ## License
 
